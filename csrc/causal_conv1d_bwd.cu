@@ -6,14 +6,9 @@
 #include <c10/util/Half.h>
 #include <c10/cuda/CUDAException.h>  // For C10_CUDA_CHECK and C10_CUDA_KERNEL_LAUNCH_CHECK
 
-#ifndef USE_ROCM
-    #include <cub/block/block_load.cuh>
-    #include <cub/block/block_store.cuh>
-    #include <cub/block/block_reduce.cuh>
-#else
-    #include <hipcub/hipcub.hpp>
-    namespace cub = hipcub;
-#endif
+#include <cub/block/block_load.cuh>
+#include <cub/block/block_store.cuh>
+#include <cub/block/block_reduce.cuh>
 
 #include "causal_conv1d.h"
 #include "causal_conv1d_common.h"
@@ -255,15 +250,9 @@ void causal_conv1d_bwd_launch(ConvParamsBwd &params, cudaStream_t stream) {
             auto kernel = &causal_conv1d_bwd_kernel<Ktraits>;
 
             if (kSmemSize >= 48 * 1024) {
-                #ifndef USE_ROCM
                 C10_CUDA_CHECK(cudaFuncSetAttribute(
                     kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
-                #else
-                // There is a slight signature discrepancy in HIP and CUDA "FuncSetAttribute" function.
-                C10_CUDA_CHECK(cudaFuncSetAttribute(
-                    (void *) kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
-                std::cerr << "Warning (causal_conv1d bwd launch): attempting to set maxDynamicSharedMemorySize on an AMD GPU which is currently a non-op (in ROCm versions <= 6.1). This might lead to undefined behavior. \n" << std::endl;
-                #endif
+
             }
 
 
